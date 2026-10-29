@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Debate Arena - レスバ対決ゲーム</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#0a0a12',
+                            card: '#121324',
+                            accent: '#00f0ff',
+                            pink: '#ff0055',
+                            yellow: '#ffe600',
+                            green: '#00ff66',
+                            purple: '#9d00ff'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0a0a12;
+            color: #e2e8f0;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(255, 0, 85, 0.08) 0%, transparent 40%);
+        }
+        .neon-border-cyan {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.3), inset 0 0 15px rgba(0, 240, 255, 0.15);
+            border: 1px solid rgba(0, 240, 255, 0.5);
+        }
+        .neon-border-pink {
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.3), inset 0 0 15px rgba(255, 0, 85, 0.15);
+            border: 1px solid rgba(255, 0, 85, 0.5);
+        }
+        .neon-text-cyan {
+            text-shadow: 0 0 8px rgba(0, 240, 255, 0.8);
+        }
+        .neon-text-pink {
+            text-shadow: 0 0 8px rgba(255, 0, 85, 0.8);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a12;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00f0ff;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-cyber-accent selection:text-black">
+
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-cyber-bg/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="switchView('stage-select')">
+                <div class="p-2 bg-gradient-to-tr from-cyber-pink to-cyber-accent rounded-lg">
+                    <i data-lucide="swords" class="w-6 h-6 text-black font-bold"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-xl tracking-wider neon-text-cyan text-cyber-accent">AI DEBATE ARENA</h1>
+                    <p class="text-xs text-gray-400">エンタメ＆論理的思考力バトルトレーニング</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <button id="sound-toggle" onclick="toggleSound()" class="p-2 rounded-lg border border-gray-700 bg-gray-800/50 hover:border-cyber-accent transition">
+                    <i id="sound-icon" data-lucide="volume-2" class="w-5 h-5 text-gray-300"></i>
+                </button>
+                <button onclick="switchView('disclaimer')" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg border border-gray-700 transition">
+                    利用目的・規約
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-4 flex flex-col">
+
+        <!-- VIEW: STAGE SELECTION -->
+        <section id="view-stage-select" class="space-y-6">
+            <div class="bg-cyber-card border border-gray-800 rounded-2xl p-6 relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-cyber-accent/10 rounded-full blur-2xl"></div>
+                <h2 class="text-2xl font-bold mb-2 flex items-center gap-2">
+                    <i data-lucide="trophy" class="text-cyber-yellow"></i>
+                    ステージ選択 (全50ステージ)
+                </h2>
+                <p class="text-sm text-gray-400 mb-4">各ステージには<span class="text-cyber-accent font-bold">10の部屋 (問)</span>が存在します。各問で論理スコア<span class="text-cyber-green font-bold">70点以上</span>を獲得すると部屋をクリアし、全10部屋クリアで次のステージが解禁されます！</p>
+                
+                <div class="flex items-center justify-between text-sm bg-black/40 p-3 rounded-xl border border-gray-800">
+                    <div>最高到達ステージ: <span id="user-max-stage" class="font-bold text-cyber-accent text-lg">1</span> / 50</div>
+                    <div>通算勝利数: <span id="user-total-clears" class="font-bold text-cyber-green text-lg">0</span> 部屋</div>
+                </div>
+            </div>
+
+            <!-- Stages Grid -->
+            <div id="stages-grid" class="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-10 gap-3">
+                <!-- Dynamically generated stage cards -->
+            </div>
+        </section>
+
+        <!-- VIEW: GAMEPLAY ARENA -->
+        <section id="view-arena" class="hidden flex-1 flex flex-col space-y-4">
+            <!-- Stage Info Header -->
+            <div class="bg-cyber-card border border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <button onclick="confirmExit()" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    </button>
+                    <div>
+                        <div class="text-xs text-cyber-accent uppercase tracking-widest font-semibold">Stage <span id="current-stage-num">1</span></div>
+                        <h3 id="stage-title" class="font-bold text-lg">テーマ: 電子書籍 vs 紙の本</h3>
+                    </div>
+                </div>
+
+                <!-- Room Progress Indicator (10 Rooms) -->
+                <div class="flex items-center gap-1.5 bg-black/50 p-2 rounded-xl border border-gray-800">
+                    <span class="text-xs text-gray-400 mr-1">部屋:</span>
+                    <div id="room-indicators" class="flex gap-1.5">
+                        <!-- 10 Room indicator dots generated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Arena Workspace -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+                <!-- Left/Main: Chat Stream & Argument Area -->
+                <div class="lg:col-span-8 flex flex-col bg-cyber-card border border-gray-800 rounded-2xl p-4 relative">
+                    
+                    <!-- Debate History / Current AI Argument -->
+                    <div id="debate-box" class="flex-1 overflow-y-auto space-y-4 mb-4 min-h-[300px] max-h-[450px] p-2">
+                        <!-- AI Speech Box -->
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-full bg-cyber-pink/20 border border-cyber-pink flex items-center justify-center shrink-0">
+                                <i data-lucide="bot" class="w-6 h-6 text-cyber-pink"></i>
+                            </div>
+                            <div class="flex-1 bg-gray-900/90 border border-gray-800 rounded-2xl p-4 text-sm leading-relaxed relative">
+                                <div class="text-xs text-cyber-pink font-semibold mb-1 flex justify-between">
+                                    <span>AI Ronjin (相手)</span>
+                                    <span id="ai-difficulty-tag" class="text-gray-400">Level 1: 初級論客</span>
+                                </div>
+                                <div id="ai-argument-text" class="text-gray-200 text-base">
+                                    思考中...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- User Speech Box (Appears after submission or loading) -->
+                        <div id="user-speech-container" class="hidden flex items-start gap-3 flex-row-reverse">
+                            <div class="w-10 h-10 rounded-full bg-cyber-accent/20 border border-cyber-accent flex items-center justify-center shrink-0">
+                                <i data-lucide="user" class="w-6 h-6 text-cyber-accent"></i>
+                            </div>
+                            <div class="flex-1 bg-cyber-accent/10 border border-cyber-accent/30 rounded-2xl p-4 text-sm leading-relaxed">
+                                <div class="text-xs text-cyber-accent font-semibold mb-1 text-right">あなた (反論)</div>
+                                <div id="user-speech-text" class="text-gray-200 text-base">
+                                    <!-- User response injected here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Box -->
+                    <div class="mt-auto pt-3 border-t border-gray-800">
+                        <label for="user-input" class="block text-xs font-semibold text-gray-400 mb-2">
+                            あなたの反論 (レス) を入力してください:
+                        </label>
+                        <div class="flex flex-col gap-2">
+                            <textarea id="user-input" rows="3" placeholder="AIの主張の矛盾や論点ズレを突いて論理的に反論しよう..." 
+                                class="w-full bg-black/60 border border-gray-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-cyber-accent resize-none transition"></textarea>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-500">Ctrl + Enter で送信</span>
+                                <button id="submit-btn" onclick="submitRebuttal()" class="bg-gradient-to-r from-cyber-accent to-blue-600 hover:opacity-90 text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 transition disabled:opacity-50">
+                                    <span>レス送信</span>
+                                    <i data-lucide="send" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Real-time Evaluation Card -->
+                <div class="lg:col-span-4 bg-cyber-card border border-gray-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                    <div>
+                        <h4 class="font-bold text-sm text-gray-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <i data-lucide="activity" class="text-cyber-accent"></i>
+                            判定エンジン (AI Judge)
+                        </h4>
+
+                        <!-- Total Score Display -->
+                        <div class="bg-black/50 border border-gray-800 rounded-2xl p-4 text-center mb-6">
+                            <div class="text-xs text-gray-400 mb-1">獲得スコア</div>
+                            <div class="text-5xl font-black tracking-tight" id="score-display">--</div>
+                            <div class="text-xs font-bold mt-2" id="score-status-badge">
+                                <span class="text-gray-500">回答待ち...</span>
+                            </div>
+                        </div>
+
+                        <!-- Score Breakdown Bars -->
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-400">論理性 (Logic)</span>
+                                    <span id="score-logic-val" class="font-bold">--/100</span>
+                                </div>
+                                <div class="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div id="score-logic-bar" class="h-full bg-cyber-accent w-0 transition-all duration-500"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-400">説得力 (Persuasiveness)</span>
+                                    <span id="score-persuasiveness-val" class="font-bold">--/100</span>
+                                </div>
+                                <div class="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div id="score-persuasiveness-bar" class="h-full bg-cyber-purple w-0 transition-all duration-500"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-400">反論の的確さ (Rebuttal)</span>
+                                    <span id="score-rebuttal-val" class="font-bold">--/100</span>
+                                </div>
+                                <div class="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div id="score-rebuttal-bar" class="h-full bg-cyber-pink w-0 transition-all duration-500"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Judge Feedback Box -->
+                    <div class="bg-black/40 border border-gray-800/80 rounded-xl p-3 text-xs leading-relaxed">
+                        <div class="font-semibold text-gray-400 mb-1 flex items-center gap-1">
+                            <i data-lucide="message-square" class="w-3.5 h-3.5 text-cyber-yellow"></i>
+                            審判のアドバイス:
+                        </div>
+                        <p id="judge-feedback-text" class="text-gray-300">
+                            相手の論理の崩れを見極めて反論を構成してください。70点以上でクリアです。
+                        </p>
+                    </div>
+
+                    <!-- Action Button (Next Room) -->
+                    <button id="next-room-btn" onclick="nextRoom()" disabled class="w-full bg-cyber-green text-black font-extrabold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        <span>次の部屋に進む</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: DISCLAIMER / ABOUT -->
+        <section id="view-disclaimer" class="hidden bg-cyber-card border border-gray-800 rounded-2xl p-6 space-y-4">
+            <h2 class="text-xl font-bold flex items-center gap-2 text-cyber-accent">
+                <i data-lucide="shield-check"></i>
+                本アプリケーションの目的と利用規約
+            </h2>
+            <div class="text-sm text-gray-300 leading-relaxed space-y-3">
+                <p>
+                    本サービス（AI Debate Arena）は、**論理的思考力・批判的思考（クリティカルシンキング）・ディベート能力向上トレーニング**を目的としたエンターテイメント用シミュレータです。
+                </p>
+                <div class="bg-black/50 p-4 rounded-xl border border-gray-800">
+                    <h3 class="font-bold text-white mb-2">利用上のガイドライン:</h3>
+                    <ul class="list-disc list-inside space-y-1 text-gray-400">
+                        <li>ここでの「レスバ（レスバトル）」は、他人への攻撃目的ではなく、純粋なディベートのゲームプレイを指します。</li>
+                        <li>誹謗中傷、差別的表現、個人攻撃などの不適切な表現は判定エンジンで大幅な減点対象となります。</li>
+                        <li>建設的で論理的な主張構成を心がけることで、高いスコアを獲得できます。</li>
+                    </ul>
+                </div>
+            </div>
+            <button onclick="switchView('stage-select')" class="bg-gray-800 hover:bg-gray-700 text-white font-bold px-6 py-2 rounded-xl border border-gray-700 text-sm">
+                戻る
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Global Footer -->
+    <footer class="border-t border-gray-900 bg-black/40 py-4 text-center text-xs text-gray-600">
+        AI Debate Arena &copy; 2026 - Powered by Gemini 2.5 Flash
+    </footer>
+
+    <!-- Logic Script -->
+    <script>
+        // ----------------------------------------------------
+        // GAME STATE & STAGE DATA
+        // ----------------------------------------------------
+        const TOTAL_STAGES = 50;
+        const ROOMS_PER_STAGE = 10;
+        const PASSING_SCORE = 70;
+
+        let gameState = {
+            maxUnlockedStage: 1,
+            totalClears: 0,
+            currentStage: 1,
+            currentRoom: 1,
+            soundEnabled: true,
+            currentAITopic: '',
+            currentAIArgument: '',
+            isEvaluating: false
+        };
+
+        // Pre-defined Stage Topics & Base Prompts (50 Stages)
+        const STAGE_TOPICS = [
+            "紙の本 vs 電子書籍", "リモートワーク vs オフィス出社", "AIによる芸術作品の価値", "学校での宿題廃止論", "現金決済の完全廃止",
+            "SNSの年齢制限義務化", "ベーシックインカム導入の是非", "週休3日制の義務化", "宇宙開発への巨額予算投下", "ペットの販売規制",
+            "遺伝子組み換え食品の安全標記", "原子力発電の即時停止", "死刑制度の存廃", "選挙権年齢の16歳引き下げ", "英語の公用語化",
+            "サマータイム導入の是非", "プログラミング教育の必須化", "救急車の有料化", "歩きスマホの過料化", "救急医療のAI化",
+            "ドローン配送の全面解禁", "AI政治家の導入", "動物園の存続意義", "メディアのファクトチェック義務化", "プラスチック製品の全面禁止",
+            "大学全入時代の高等教育無償化", "フェイクニュース発信者の罰則化", "終身雇用の完全崩壊と成果主義", "自動運転車の事故責任所在地", "メタバース内での税金徴収",
+            "遺伝子編集（クリスパー）の受精卵応用", "安楽死の法制化", "宇宙ゴミ（デブリ）対策の義務負担", "海洋プラスチック削減のための貿易制限", "定年制の完全廃止",
+            "AIによる裁判・判決の自動化", "クローン技術の医療応用", "超加工食品への特別課税", "月面領有権の禁止条約", "気候変動対策としての炭素税導入",
+            "脳機インターフェース（BMI）の一般開放", "人工肉・昆虫食の義務的普及", "高度AIの開発一時凍結", "個人情報のデータ銀行化", "デジタル遺産の自動削除法",
+            "超高速交通網（ハイパーループ）へのインファ投資", "サイバー兵器の国際禁止条約", "人間の寿命延伸技術の受容", "完全無人店舗の拡大と雇用の変化", "究極のAI統治（ソブリンAI）の可能性"
+        ];
+
+        // Web Audio API Sound Generator
+        let audioCtx = null;
+        function playSound(type) {
+            if (!gameState.soundEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'click') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, now);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'pass') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(880, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'fail') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.setValueAtTime(150, now + 0.15);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ----------------------------------------------------
+        // INITIALIZATION & LOCAL STORAGE
+        // ----------------------------------------------------
+        window.onload = function() {
+            lucide.createIcons();
+            loadProgress();
+            renderStageGrid();
+            
+            // Key binding (Ctrl+Enter to submit)
+            document.getElementById('user-input').addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    submitRebuttal();
+                }
+            });
+        };
+
+        function loadProgress() {
+            const savedMax = localStorage.getItem('ai_debate_max_stage');
+            const savedClears = localStorage.getItem('ai_debate_total_clears');
+            if (savedMax) gameState.maxUnlockedStage = parseInt(savedMax, 10);
+            if (savedClears) gameState.totalClears = parseInt(savedClears, 10);
+
+            document.getElementById('user-max-stage').innerText = gameState.maxUnlockedStage;
+            document.getElementById('user-total-clears').innerText = gameState.totalClears;
+        }
+
+        function saveProgress() {
+            localStorage.setItem('ai_debate_max_stage', gameState.maxUnlockedStage);
+            localStorage.setItem('ai_debate_total_clears', gameState.totalClears);
+            document.getElementById('user-max-stage').innerText = gameState.maxUnlockedStage;
+            document.getElementById('user-total-clears').innerText = gameState.totalClears;
+        }
+
+        function toggleSound() {
+            gameState.soundEnabled = !gameState.soundEnabled;
+            const icon = document.getElementById('sound-icon');
+            if (gameState.soundEnabled) {
+                icon.setAttribute('data-lucide', 'volume-2');
+            } else {
+                icon.setAttribute('data-lucide', 'volume-x');
+            }
+            lucide.createIcons();
+            playSound('click');
+        }
+
+        // ----------------------------------------------------
+        // UI SWITCHING
+        // ----------------------------------------------------
+        function switchView(viewName) {
+            playSound('click');
+            document.getElementById('view-stage-select').classList.add('hidden');
+            document.getElementById('view-arena').classList.add('hidden');
+            document.getElementById('view-disclaimer').classList.add('hidden');
+
+            if (viewName === 'stage-select') {
+                renderStageGrid();
+                document.getElementById('view-stage-select').classList.remove('hidden');
+            } else if (viewName === 'arena') {
+                document.getElementById('view-arena').classList.remove('hidden');
+            } else if (viewName === 'disclaimer') {
+                document.getElementById('view-disclaimer').classList.remove('hidden');
+            }
+        }
+
+        function renderStageGrid() {
+            const container = document.getElementById('stages-grid');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= TOTAL_STAGES; i++) {
+                const isUnlocked = i <= gameState.maxUnlockedStage;
+                const card = document.createElement('button');
+                
+                card.className = `p-3 rounded-xl border flex flex-col items-center justify-center transition relative ${
+                    isUnlocked 
+                    ? 'bg-cyber-card border-gray-700 hover:border-cyber-accent hover:scale-105 cursor-pointer' 
+                    : 'bg-black/40 border-gray-900 opacity-40 cursor-not-allowed'
+                }`;
+
+                card.onclick = () => {
+                    if (isUnlocked) startStage(i);
+                };
+
+                card.innerHTML = `
+                    <div class="text-xs text-gray-500 font-bold mb-1">ST #${i}</div>
+                    <i data-lucide="${isUnlocked ? 'swords' : 'lock'}" class="w-5 h-5 ${isUnlocked ? 'text-cyber-accent' : 'text-gray-600'} mb-1"></i>
+                    <div class="text-[10px] text-gray-400 text-center truncate w-full">${STAGE_TOPICS[i-1] || '議論テーマ'}</div>
+                `;
+                container.appendChild(card);
+            }
+            lucide.createIcons();
+        }
+
+        function confirmExit() {
+            if (confirm("現在のステージ挑戦を終了してステージ選択に戻りますか？")) {
+                switchView('stage-select');
+            }
+        }
+
+        // ----------------------------------------------------
+        // GAMEPLAY ENGINE (STAGES & ROOMS)
+        // ----------------------------------------------------
+        function startStage(stageNum) {
+            gameState.currentStage = stageNum;
+            gameState.currentRoom = 1;
+
+            document.getElementById('current-stage-num').innerText = stageNum;
+            document.getElementById('stage-title').innerText = `テーマ: ${STAGE_TOPICS[stageNum - 1]}`;
+            document.getElementById('ai-difficulty-tag').innerText = `Lv.${stageNum} 論客`;
+
+            switchView('arena');
+            loadRoom();
+        }
+
+        function renderRoomIndicators() {
+            const container = document.getElementById('room-indicators');
+            container.innerHTML = '';
+
+            for (let r = 1; r <= ROOMS_PER_STAGE; r++) {
+                const dot = document.createElement('div');
+                let colorClass = 'bg-gray-800 border-gray-700';
+                if (r < gameState.currentRoom) {
+                    colorClass = 'bg-cyber-green border-cyber-green'; // Cleared
+                } else if (r === gameState.currentRoom) {
+                    colorClass = 'bg-cyber-accent border-cyber-accent animate-pulse'; // Current
+                }
+
+                dot.className = `w-3 h-3 rounded-full border ${colorClass}`;
+                dot.title = `問 ${r}`;
+                container.appendChild(dot);
+            }
+        }
+
+        async function loadRoom() {
+            renderRoomIndicators();
+            resetEvaluationUI();
+
+            const aiTextEl = document.getElementById('ai-argument-text');
+            aiTextEl.innerText = "相手AIが論理的な反論を準備中...";
+
+            // Fetch AI Argument via Gemini API
+            const stageTopic = STAGE_TOPICS[gameState.currentStage - 1];
+            const difficultyLevel = gameState.currentStage;
+            const roomNum = gameState.currentRoom;
+
+            const systemPrompt = `
+あなたはディベートゲームにおける対戦相手のAI論客です。
+現在のステージ難易度: ${difficultyLevel} / 50 (数字が大きいほど論理的思考力・詭弁・反論強度が上がります)。
+今回の議題: 「${stageTopic}」
+部屋番号: ${roomNum} / 10
+
+指示:
+プレイヤー（ユーザー）を惑わせる、または鋭いツッコミを入れる『AI側の主張・反論』を1つ提示してください。
+- 難易度1〜10: 一般的な意見や、やや極端な一歩的意見。
+- 難易度11〜30: 論理的な反論や反例の提示。
+- 難易度31〜50: 高度なフレームワーク、前提の疑い、または巧みな詭弁を含んだ鋭い主張。
+- 150字程度で簡潔に提示してください。前置きや解説は不要です。主張本文のみ出力してください。
+`;
+
+            try {
+                const responseText = await callGeminiAPI("現在指定された議題に対して、プレイヤーが反論すべき短い挑戦的な意見を述べてください。", systemPrompt);
+                aiTextEl.innerText = responseText.trim();
+                gameState.currentAIArgument = responseText.trim();
+            } catch (err) {
+                console.error("Gemini API Error:", err);
+                aiTextEl.innerText = `（${stageTopic}に関して）その主張には大きな論理的飛躍があります。具体的な根拠や実現性についてのデータが欠けているのではないでしょうか？`;
+                gameState.currentAIArgument = aiTextEl.innerText;
+            }
+        }
+
+        function resetEvaluationUI() {
+            document.getElementById('user-speech-container').classList.add('hidden');
+            document.getElementById('user-input').value = '';
+            document.getElementById('user-input').disabled = false;
+            document.getElementById('submit-btn').disabled = false;
+
+            document.getElementById('score-display').innerText = '--';
+            document.getElementById('score-display').className = 'text-5xl font-black tracking-tight text-white';
+            document.getElementById('score-status-badge').innerHTML = '<span class="text-gray-500">回答待ち...</span>';
+
+            document.getElementById('score-logic-val').innerText = '--/100';
+            document.getElementById('score-logic-bar').style.width = '0%';
+
+            document.getElementById('score-persuasiveness-val').innerText = '--/100';
+            document.getElementById('score-persuasiveness-bar').style.width = '0%';
+
+            document.getElementById('score-rebuttal-val').innerText = '--/100';
+            document.getElementById('score-rebuttal-bar').style.width = '0%';
+
+            document.getElementById('judge-feedback-text').innerText = '相手の論理の崩れを見極めて反論を構成してください。70点以上でクリアです。';
+            document.getElementById('next-room-btn').disabled = true;
+        }
+
+        // ----------------------------------------------------
+        // SUBMISSION & EVALUATION ENGINE
+        // ----------------------------------------------------
+        async function submitRebuttal() {
+            if (gameState.isEvaluating) return;
+
+            const userText = document.getElementById('user-input').value.trim();
+            if (!userText) {
+                alert("反論（レス）を入力してください！");
+                return;
+            }
+
+            playSound('click');
+            gameState.isEvaluating = true;
+
+            // Display User Speech
+            document.getElementById('user-speech-text').innerText = userText;
+            document.getElementById('user-speech-container').classList.remove('hidden');
+
+            // Disable Input during API call
+            document.getElementById('user-input').disabled = true;
+            document.getElementById('submit-btn').disabled = true;
+
+            document.getElementById('score-display').innerText = '...';
+            document.getElementById('score-status-badge').innerHTML = '<span class="text-cyber-accent animate-pulse">審判AIが判定中...</span>';
+
+            // Call Gemini API for Evaluation
+            const systemPrompt = `
+あなたはディベートゲームの厳正で公正な「審判AI」です。
+相手の主張と、ユーザーの反論を評価し、JSON形式でのみレスポンスを返してください。
+
+相手の主張:
+"${gameState.currentAIArgument}"
+
+評価基準:
+1. 論理性 (logic): 前提から結論への筋道が通っているか (0-100)
+2. 説得力 (persuasiveness): 根拠や具体的例示、説得性があるか (0-100)
+3. 反論の的確さ (rebuttal): 相手の主張の弱点や矛盾を的確に突いているか (0-100)
+
+総合スコア (totalScore) は上記3つの平均値（整数）とします。
+
+返却するJSONフォーマット（Markdown等の装飾なし、純粋なJSON文字列のみ）:
+{
+  "logic": 80,
+  "persuasiveness": 75,
+  "rebuttal": 85,
+  "totalScore": 80,
+  "feedback": "相手の前提の矛盾を的確に突いており、説得力のある見事な反論です。"
+}
+`;
+
+            try {
+                const rawResult = await callGeminiAPI(`ユーザーの反論:\n"${userText}"`, systemPrompt, true);
+                let evalData;
+                try {
+                    evalData = JSON.parse(rawResult);
+                } catch (pErr) {
+                    // Fallback JSON parser if response has backticks
+                    const cleanJson = rawResult.replace(/```json/g, '').replace(/```/g, '').trim();
+                    evalData = JSON.parse(cleanJson);
+                }
+
+                applyEvaluationResult(evalData);
+            } catch (err) {
+                console.error("Evaluation API Error:", err);
+                // Fallback score generation on network error
+                const mockScore = Math.floor(Math.random() * 30) + 65; // 65 - 94
+                applyEvaluationResult({
+                    logic: mockScore,
+                    persuasiveness: mockScore - 5,
+                    rebuttal: mockScore + 5,
+                    totalScore: mockScore,
+                    feedback: "（オフライン判定）主張の筋道は通っています。相手の根拠に焦点を当てた点が評価できます。"
+                });
+            } finally {
+                gameState.isEvaluating = false;
+            }
+        }
+
+        function applyEvaluationResult(evalData) {
+            const total = evalData.totalScore || Math.round((evalData.logic + evalData.persuasiveness + evalData.rebuttal) / 3);
+            const passed = total >= PASSING_SCORE;
+
+            // Animate Scores
+            document.getElementById('score-display').innerText = total;
+            document.getElementById('score-logic-val').innerText = `${evalData.logic}/100`;
+            document.getElementById('score-logic-bar').style.width = `${evalData.logic}%`;
+
+            document.getElementById('score-persuasiveness-val').innerText = `${evalData.persuasiveness}/100`;
+            document.getElementById('score-persuasiveness-bar').style.width = `${evalData.persuasiveness}%`;
+
+            document.getElementById('score-rebuttal-val').innerText = `${evalData.rebuttal}/100`;
+            document.getElementById('score-rebuttal-bar').style.width = `${evalData.rebuttal}%`;
+
+            document.getElementById('judge-feedback-text').innerText = evalData.feedback || '';
+
+            if (passed) {
+                playSound('pass');
+                document.getElementById('score-display').className = 'text-5xl font-black tracking-tight text-cyber-green neon-text-cyan';
+                document.getElementById('score-status-badge').innerHTML = '<span class="bg-cyber-green/20 text-cyber-green px-3 py-1 rounded-full border border-cyber-green">PASSED! 突破成功</span>';
+                document.getElementById('next-room-btn').disabled = false;
+            } else {
+                playSound('fail');
+                document.getElementById('score-display').className = 'text-5xl font-black tracking-tight text-cyber-pink neon-text-pink';
+                document.getElementById('score-status-badge').innerHTML = '<span class="bg-cyber-pink/20 text-cyber-pink px-3 py-1 rounded-full border border-cyber-pink">FAILED (70点未満)</span>';
+                
+                // Allow re-trying same room
+                document.getElementById('user-input').disabled = false;
+                document.getElementById('submit-btn').disabled = false;
+            }
+        }
+
+        function nextRoom() {
+            playSound('click');
+            gameState.totalClears += 1;
+
+            if (gameState.currentRoom < ROOMS_PER_STAGE) {
+                gameState.currentRoom += 1;
+                loadRoom();
+            } else {
+                // STAGE CLEARED!
+                alert(`🎉 STAGE ${gameState.currentStage} 完全制覇！\nおめでとうございます！10個の部屋をすべて突破しました！`);
+                
+                if (gameState.currentStage >= gameState.maxUnlockedStage && gameState.maxUnlockedStage < TOTAL_STAGES) {
+                    gameState.maxUnlockedStage = gameState.currentStage + 1;
+                }
+                saveProgress();
+                switchView('stage-select');
+            }
+        }
+
+        // ----------------------------------------------------
+        // GEMINI API HELPER (Standard gemini-2.5-flash)
+        // ----------------------------------------------------
+        async function callGeminiAPI(userQuery, systemPrompt = "", isJson = false) {
+            const apiKey = ""; // Canvas runtime automatically supplies key if empty string
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [
+                    {
+                        parts: [{ text: userQuery }]
+                    }
+                ]
+            };
+
+            if (systemPrompt) {
+                payload.systemInstruction = {
+                    parts: [{ text: systemPrompt }]
+                };
+            }
+
+            if (isJson) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json"
+                };
+            }
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API Network Error: ${response.status}`);
+            }
+
+            const result = await response.json();
+            const candidateText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (!candidateText) {
+                throw new Error("Invalid API Response structure");
+            }
+
+            return candidateText;
+        }
+    </script>
+</body>
+</html>
