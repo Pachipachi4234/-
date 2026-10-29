@@ -112,7 +112,10 @@
             </p>
             <div>
                 <label for="api-key-input" class="block text-xs text-gray-400 mb-1">Gemini API Key:</label>
-                <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full bg-black/70 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-cyber-accent">
+                <input type="password" id="api-key-input" placeholder="AIzaSy... や AQ..." class="w-full bg-black/70 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-cyber-accent">
+                <p id="api-key-warning" class="hidden text-[11px] text-cyber-pink mt-1">
+                    ⚠️ キーが未入力か不完全です。<a href="https://aistudio.google.com/app/apikey" target="_blank" class="underline text-cyber-accent">Google AI Studio</a> で取得したキーを貼り付けてください。
+                </p>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeApiKeyModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs rounded-xl text-gray-300">スキップ (オフラインで遊ぶ)</button>
@@ -472,40 +475,24 @@
 
         function saveApiKey() {
             const val = document.getElementById('api-key-input').value.trim();
+            const warningEl = document.getElementById('api-key-warning');
+            
+            // どんなキープレフィックス（AIzaSy...やAQ...など）でもそのまま受け入れるようにチェックを緩和
+            if (!val) {
+                warningEl.classList.remove('hidden');
+                return;
+            } else {
+                warningEl.classList.add('hidden');
+            }
+
             gameState.apiKey = val;
             localStorage.setItem('ai_debate_api_key', val);
             closeApiKeyModal();
-            alert(val ? "Gemini APIキーを保存しました！" : "APIキー設定をクリアしました（オフラインモードで稼働します）。");
-        }
-
-        function toggleSound() {
-            gameState.soundEnabled = !gameState.soundEnabled;
-            const icon = document.getElementById('sound-icon');
-            if (gameState.soundEnabled) {
-                icon.setAttribute('data-lucide', 'volume-2');
+            
+            if (val) {
+                alert("APIキーを保存しました！「AIzaSy...」から始まるキーの場合、リアルタイムAI対戦がスタートします。");
             } else {
-                icon.setAttribute('data-lucide', 'volume-x');
-            }
-            lucide.createIcons();
-            playSound('click');
-        }
-
-        // ----------------------------------------------------
-        // UI SWITCHING
-        // ----------------------------------------------------
-        function switchView(viewName) {
-            playSound('click');
-            document.getElementById('view-stage-select').classList.add('hidden');
-            document.getElementById('view-arena').classList.add('hidden');
-            document.getElementById('view-disclaimer').classList.add('hidden');
-
-            if (viewName === 'stage-select') {
-                renderStageGrid();
-                document.getElementById('view-stage-select').classList.remove('hidden');
-            } else if (viewName === 'arena') {
-                document.getElementById('view-arena').classList.remove('hidden');
-            } else if (viewName === 'disclaimer') {
-                document.getElementById('view-disclaimer').classList.remove('hidden');
+                alert("APIキー設定をクリアしました（オフラインモードで稼働します）。");
             }
         }
 
@@ -820,6 +807,8 @@
         // ----------------------------------------------------
         // GEMINI API HELPER (Standard gemini-2.5-flash)
         // ----------------------------------------------------
+        // GEMINI API HELPER (Standard gemini-2.5-flash with fallback)
+        // ----------------------------------------------------
         async function callGeminiAPI(userQuery, systemPrompt = "", isJson = false) {
             const apiKey = gameState.apiKey;
             
@@ -827,46 +816,70 @@
                 throw new Error("No API Key configured. Operating in offline mode.");
             }
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            // Primary model: gemini-2.5-flash, Fallbacks: gemini-1.5-flash, gemini-2.0-flash
+            const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+            let lastError = null;
 
-            const payload = {
-                contents: [
-                    {
-                        parts: [{ text: userQuery }]
+            for (const model of models) {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [
+                        {
+                            parts: [{ text: userQuery }]
+                        }
+                    ]
+                };
+
+                if (systemPrompt) {
+                    payload.systemInstruction = {
+                        parts: [{ text: systemPrompt }]
+                    };
+                }
+
+                if (isJson) {
+                    payload.generationConfig = {
+                        responseMimeType: "application/json"
+                    };
+                }
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        const errorMsg = errorData.error?.message || `HTTP ${response.status}`;
+                        console.warn(`[Gemini API Error (${model})]:`, errorMsg);
+                        
+                        lastError = new Error(`モデル ${model} (${response.status}): ${errorMsg}`);
+                        continue; // 次のモデルで再試行
                     }
-                ]
-            };
 
-            if (systemPrompt) {
-                payload.systemInstruction = {
-                    parts: [{ text: systemPrompt }]
-                };
+                    const result = await response.json();
+                    const candidateText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (!candidateText) {
+                        lastError = new Error("APIからのレスポンス形式が不正です");
+                        continue;
+                    }
+
+                    return candidateText;
+
+                } catch (fetchErr) {
+                    lastError = fetchErr;
+                    console.warn(`Fetch error for ${model}:`, fetchErr);
+                }
             }
 
-            if (isJson) {
-                payload.generationConfig = {
-                    responseMimeType: "application/json"
-                };
+            // すべてのモデルで失敗した場合のハンドリング
+            if (lastError) {
+                console.error("All Gemini API attempts failed:", lastError);
+                throw lastError;
             }
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                throw new Error(`API Network Error: ${response.status}`);
-            }
-
-            const result = await response.json();
-            const candidateText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (!candidateText) {
-                throw new Error("Invalid API Response structure");
-            }
-
-            return candidateText;
         }
     </script>
 </body>
