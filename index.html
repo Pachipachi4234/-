@@ -84,6 +84,11 @@
             </div>
 
             <div class="flex items-center gap-4">
+                <!-- API Key Config Button -->
+                <button onclick="openApiKeyModal()" class="p-2 rounded-lg border border-gray-700 bg-gray-800/50 hover:border-cyber-accent text-gray-300 transition flex items-center gap-1.5 text-xs font-medium">
+                    <i data-lucide="key" class="w-4 h-4 text-cyber-yellow"></i>
+                    <span class="hidden sm:inline">APIキー設定</span>
+                </button>
                 <button id="sound-toggle" onclick="toggleSound()" class="p-2 rounded-lg border border-gray-700 bg-gray-800/50 hover:border-cyber-accent transition">
                     <i id="sound-icon" data-lucide="volume-2" class="w-5 h-5 text-gray-300"></i>
                 </button>
@@ -93,6 +98,28 @@
             </div>
         </div>
     </header>
+
+    <!-- API KEY MODAL -->
+    <div id="api-key-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-cyber-card border border-cyber-accent/40 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+            <h3 class="text-lg font-bold text-cyber-accent flex items-center gap-2">
+                <i data-lucide="key" class="text-cyber-yellow"></i>
+                Gemini APIキー設定
+            </h3>
+            <p class="text-xs text-gray-300 leading-relaxed">
+                GitHub Pages等でGemini AIによるリアルタイムAI対戦・判定を行うには、Google AI Studioで取得した無料の<strong class="text-white">Gemini APIキー</strong>が必要です。<br>
+                ※キー未設定の場合でもオフラインモード（内蔵テキスト）でプレイ可能です。
+            </p>
+            <div>
+                <label for="api-key-input" class="block text-xs text-gray-400 mb-1">Gemini API Key:</label>
+                <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full bg-black/70 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-cyber-accent">
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeApiKeyModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs rounded-xl text-gray-300">キャンセル</button>
+                <button onclick="saveApiKey()" class="px-4 py-2 bg-cyber-accent text-black font-bold text-xs rounded-xl hover:opacity-90">保存する</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Container -->
     <main class="flex-1 max-w-5xl w-full mx-auto p-4 flex flex-col">
@@ -315,23 +342,18 @@
             currentStage: 1,
             currentRoom: 1,
             soundEnabled: true,
+            apiKey: '',
             currentAITopic: '',
             currentAIArgument: '',
             isEvaluating: false
         };
 
-        // Pre-defined Stage Topics & Base Prompts (50 Stages)
-        const STAGE_TOPICS = [
-            "紙の本 vs 電子書籍", "リモートワーク vs オフィス出社", "AIによる芸術作品の価値", "学校での宿題廃止論", "現金決済の完全廃止",
-            "SNSの年齢制限義務化", "ベーシックインカム導入の是非", "週休3日制の義務化", "宇宙開発への巨額予算投下", "ペットの販売規制",
-            "遺伝子組み換え食品の安全標記", "原子力発電の即時停止", "死刑制度の存廃", "選挙権年齢の16歳引き下げ", "英語の公用語化",
-            "サマータイム導入の是非", "プログラミング教育の必須化", "救急車の有料化", "歩きスマホの過料化", "救急医療のAI化",
-            "ドローン配送の全面解禁", "AI政治家の導入", "動物園の存続意義", "メディアのファクトチェック義務化", "プラスチック製品の全面禁止",
-            "大学全入時代の高等教育無償化", "フェイクニュース発信者の罰則化", "終身雇用の完全崩壊と成果主義", "自動運転車の事故責任所在地", "メタバース内での税金徴収",
-            "遺伝子編集（クリスパー）の受精卵応用", "安楽死の法制化", "宇宙ゴミ（デブリ）対策の義務負担", "海洋プラスチック削減のための貿易制限", "定年制の完全廃止",
-            "AIによる裁判・判決の自動化", "クローン技術の医療応用", "超加工食品への特別課税", "月面領有権の禁止条約", "気候変動対策としての炭素税導入",
-            "脳機インターフェース（BMI）の一般開放", "人工肉・昆虫食の義務的普及", "高度AIの開発一時凍結", "個人情報のデータ銀行化", "デジタル遺産の自動削除法",
-            "超高速交通網（ハイパーループ）へのインファ投資", "サイバー兵器の国際禁止条約", "人間の寿命延伸技術の受容", "完全無人店舗の拡大と雇用の変化", "究極のAI統治（ソブリンAI）の可能性"
+        // Fallback offline arguments template
+        const FALLBACK_ARGUMENTS = [
+            "その主張には客観的なデータや具体的な事例が不足しています。単なる主観だけでは説得力に欠けるのではないでしょうか？",
+            "一見正しそうに聞こえますが、長期的な影響やコスト面でのデメリットを無視していませんか？",
+            "その論理を推し進めると、極端な例外事例が発生した際に破綻してしまいます。どう対処するおつもりですか？",
+            "前提としている事実自体が時代遅れ、あるいは偏っている可能性があります。別の視点を考慮すべきです。"
         ];
 
         // Web Audio API Sound Generator
@@ -395,8 +417,14 @@
         function loadProgress() {
             const savedMax = localStorage.getItem('ai_debate_max_stage');
             const savedClears = localStorage.getItem('ai_debate_total_clears');
+            const savedKey = localStorage.getItem('ai_debate_api_key');
+
             if (savedMax) gameState.maxUnlockedStage = parseInt(savedMax, 10);
             if (savedClears) gameState.totalClears = parseInt(savedClears, 10);
+            if (savedKey) {
+                gameState.apiKey = savedKey;
+                document.getElementById('api-key-input').value = savedKey;
+            }
 
             document.getElementById('user-max-stage').innerText = gameState.maxUnlockedStage;
             document.getElementById('user-total-clears').innerText = gameState.totalClears;
@@ -407,6 +435,24 @@
             localStorage.setItem('ai_debate_total_clears', gameState.totalClears);
             document.getElementById('user-max-stage').innerText = gameState.maxUnlockedStage;
             document.getElementById('user-total-clears').innerText = gameState.totalClears;
+        }
+
+        function openApiKeyModal() {
+            playSound('click');
+            document.getElementById('api-key-modal').classList.remove('hidden');
+        }
+
+        function closeApiKeyModal() {
+            playSound('click');
+            document.getElementById('api-key-modal').classList.add('hidden');
+        }
+
+        function saveApiKey() {
+            const val = document.getElementById('api-key-input').value.trim();
+            gameState.apiKey = val;
+            localStorage.setItem('ai_debate_api_key', val);
+            closeApiKeyModal();
+            alert(val ? "Gemini APIキーを保存しました！" : "APIキー設定をクリアしました（オフラインモードで稼働します）。");
         }
 
         function toggleSound() {
@@ -539,8 +585,9 @@
                 aiTextEl.innerText = responseText.trim();
                 gameState.currentAIArgument = responseText.trim();
             } catch (err) {
-                console.error("Gemini API Error:", err);
-                aiTextEl.innerText = `（${stageTopic}に関して）その主張には大きな論理的飛躍があります。具体的な根拠や実現性についてのデータが欠けているのではないでしょうか？`;
+                console.warn("Gemini API Offline/Error, using internal generator:", err);
+                const randomFallback = FALLBACK_ARGUMENTS[Math.floor(Math.random() * FALLBACK_ARGUMENTS.length)];
+                aiTextEl.innerText = `（「${stageTopic}」について）${randomFallback}`;
                 gameState.currentAIArgument = aiTextEl.innerText;
             }
         }
@@ -599,6 +646,10 @@
 あなたはディベートゲームの厳正で公正な「審判AI」です。
 相手の主張と、ユーザーの反論を評価し、JSON形式でのみレスポンスを返してください。
 
+【超重要判定ルール】
+- 「しらんわ」「あ」「草」「無効」「???」などの短すぎる回答、無関係な単語、論理的な説明になっていない適当な返答には、容赦なく「10〜30点」の低いスコアをつけて不合格にしてください。
+- 相手の論点に対して理由（〜だから、なぜなら）や根拠を持って反論している場合のみ高評価（70点以上）にしてください。
+
 相手の主張:
 "${gameState.currentAIArgument}"
 
@@ -633,17 +684,61 @@
                 applyEvaluationResult(evalData);
             } catch (err) {
                 console.error("Evaluation API Error:", err);
-                // Fallback score generation on network error
-                const mockScore = Math.floor(Math.random() * 30) + 65; // 65 - 94
-                applyEvaluationResult({
-                    logic: mockScore,
-                    persuasiveness: mockScore - 5,
-                    rebuttal: mockScore + 5,
-                    totalScore: mockScore,
-                    feedback: "（オフライン判定）主張の筋道は通っています。相手の根拠に焦点を当てた点が評価できます。"
-                });
+                
+                // Smart Offline Evaluation Fallback
+                const evalData = evaluateOfflineResponse(userText, gameState.currentAIArgument);
+                applyEvaluationResult(evalData);
             } finally {
                 gameState.isEvaluating = false;
+            }
+        }
+
+        // Offline Rule-based Evaluation System
+        function evaluateOfflineResponse(userText, aiArgument) {
+            const cleanText = userText.trim();
+            const len = cleanText.length;
+
+            // 1. Extreme short / lazy answer detection
+            if (len < 8) {
+                return {
+                    logic: 15,
+                    persuasiveness: 10,
+                    rebuttal: 10,
+                    totalScore: 12,
+                    feedback: "（オフライン判定）返答が短すぎるか、議論になっていません。「しらんわ」などの一言では説得力・論理性が皆無です。"
+                };
+            }
+
+            // 2. Logic indicators check
+            let score = 40;
+            const logicalKeywords = ["なぜなら", "だから", "しかし", "根拠", "データ", "例えば", "理由", "前提", "影響", "コスト", "実際"];
+            let keywordMatches = 0;
+            
+            logicalKeywords.forEach(kw => {
+                if (cleanText.includes(kw)) keywordMatches++;
+            });
+
+            score += Math.min(len * 0.8, 30); // length weight
+            score += keywordMatches * 10;     // logic weight
+
+            const finalScore = Math.min(Math.round(score), 95);
+
+            if (finalScore < PASSING_SCORE) {
+                return {
+                    logic: finalScore,
+                    persuasiveness: Math.max(10, finalScore - 10),
+                    rebuttal: Math.max(10, finalScore - 5),
+                    totalScore: finalScore,
+                    feedback: "（オフライン判定）少し根拠が弱いようです。「なぜなら〜」「しかし〜」などの接続詞を使い、相手の論点を明確に批判してみましょう。"
+                };
+            } else {
+                return {
+                    logic: finalScore,
+                    persuasiveness: finalScore - 5,
+                    rebuttal: finalScore + 2,
+                    totalScore: finalScore,
+                    feedback: "（オフライン判定）論理的なキーワードが含まれており、一定の説得力がある反論として認められました！"
+                };
             }
         }
 
@@ -703,7 +798,12 @@
         // GEMINI API HELPER (Standard gemini-2.5-flash)
         // ----------------------------------------------------
         async function callGeminiAPI(userQuery, systemPrompt = "", isJson = false) {
-            const apiKey = ""; // Canvas runtime automatically supplies key if empty string
+            const apiKey = gameState.apiKey;
+            
+            if (!apiKey) {
+                throw new Error("No API Key configured. Operating in offline mode.");
+            }
+
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
             const payload = {
