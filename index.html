@@ -115,8 +115,8 @@
                 <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full bg-black/70 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-cyber-accent">
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeApiKeyModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs rounded-xl text-gray-300">キャンセル</button>
-                <button onclick="saveApiKey()" class="px-4 py-2 bg-cyber-accent text-black font-bold text-xs rounded-xl hover:opacity-90">保存する</button>
+                <button onclick="closeApiKeyModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs rounded-xl text-gray-300">スキップ (オフラインで遊ぶ)</button>
+                <button onclick="saveApiKey()" class="px-4 py-2 bg-cyber-accent text-black font-bold text-xs rounded-xl hover:opacity-90">保存して開始</button>
             </div>
         </div>
     </div>
@@ -330,6 +330,22 @@
     <!-- Logic Script -->
     <script>
         // ----------------------------------------------------
+        // STAGE TOPICS LIST (50 Stages)
+        // ----------------------------------------------------
+        const STAGE_TOPICS = [
+            "紙の本 vs 電子書籍", "きのこの山 vs たけのこの里", "朝型 vs 夜型", "犬 vs 猫", "夏 vs 冬",
+            "現金派 vs キャッシュレス派", "持ち家 vs 賃貸", "田舎暮らし vs 都会暮らし", "自炊 vs 外食", "文系 vs 理系",
+            "AIは人間の職を奪うか", "ベーシックインカムの導入", "週休3日制の義務化", "レジ袋有料化の是非", "救急車の有料化",
+            "大学進学は必須か", "英語教育の早期化", "リモートワーク全般化", "SNSの年齢制限", "宿題の廃止",
+            "電子マネーの一本化", "宇宙開発への巨額投資", "遺伝子組み換え食品", "原子力発電の是非", "AIによる裁判判定",
+            "消費税の増税・減税", "定年制の廃止", "救助不要論（自己責任論）", "死刑制度の可否", "救急医療の優先順位",
+            "選挙の義務化", "電子投票の導入", "少子化対策の現金給付", "著作権保護の期間短縮", "ベーシックサービス制度",
+            "Metaverse社会の到来", "完全自動運転の責任所在", "不老不死技術の研究", "人間関係の断捨離", "競争社会 vs 平等社会",
+            "火星移住計画の現実性", "AIアートの著作権", "記憶消去技術の倫理", "中央集権 vs 分散型社会", "地球外生命体探索の優先度",
+            "合成肉（培養肉）の普及", "監視カメラの全域設置", "脳機界面（BMI）の導入", "仮想通貨の法的地位", "究極のAI統治社会"
+        ];
+
+        // ----------------------------------------------------
         // GAME STATE & STAGE DATA
         // ----------------------------------------------------
         const TOTAL_STAGES = 50;
@@ -412,6 +428,13 @@
                     submitRebuttal();
                 }
             });
+
+            // Prompt API Key modal on first launch if not configured
+            if (!gameState.apiKey) {
+                setTimeout(() => {
+                    openApiKeyModal();
+                }, 500);
+            }
         };
 
         function loadProgress() {
